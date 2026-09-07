@@ -147,3 +147,15 @@ async def test_final_report_not_verified_halts(tmp_path, paper, good_tarball):
     run = await Orchestrator(new_run(paper, s), s, adv, form).run_to_completion()
     assert run.status == "halted"
     assert "final check not verified" in run.halt_reason
+
+
+async def test_template_project_used_when_none_given(tmp_path, paper, good_tarball):
+    s = settings(tmp_path)
+    adv = FakeAdvisor(grades=[accept()])
+    form = FakeFormalizer(script=[("COMPLETE", good_tarball, None)])
+    run = await Orchestrator(new_run(paper, s), s, adv, form).run_to_completion()
+    assert run.status == "done"
+    proj = Path(run.lean_project_dir)
+    assert proj == s.runs_dir / "t1" / "project"
+    assert (proj / "lakefile.toml").exists() and (proj / "lean-toolchain").read_text().strip() == "leanprover/lean4:v4.28.0"
+    assert 'rev = "v4.28.0"' in (proj / "lakefile.toml").read_text()

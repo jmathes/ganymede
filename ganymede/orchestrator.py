@@ -10,6 +10,7 @@ mathematician (Claude), the referee (Claude), and the formalizer (Aristotle), an
 from __future__ import annotations
 
 import logging
+import shutil
 import time
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from ganymede.notify import notify
 from ganymede.state import Attempt, Run, RunStatus, Slice, SliceStatus, now, write_json
 
 log = logging.getLogger("ganymede")
+TEMPLATE_PROJECT = Path(__file__).resolve().parent.parent / "templates" / "lean-project"
 
 
 class Halt(Exception):
@@ -83,6 +85,13 @@ class Orchestrator:
     # ---- phases -------------------------------------------------------------
 
     def _plan(self) -> None:
+        if not self.run.lean_project_dir:
+            # No project supplied: start from the template pinned to the Mathlib version Aristotle supports.
+            dest = self.run_dir / "project"
+            if not dest.exists():
+                shutil.copytree(TEMPLATE_PROJECT, dest)
+            self.run.lean_project_dir = str(dest)
+            self.run.log(f"created Lean project from template at {dest}", self.settings.runs_dir)
         paper = Path(self.run.paper_path).read_text(errors="replace")
         lean_report = None
         if self.run.lean_project_dir:

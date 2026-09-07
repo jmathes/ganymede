@@ -10,15 +10,15 @@ AIs, without needing to understand the mathematics itself.
 
 ## Origin
 
-This project came out of a conversation in September 2026 between Joe Mathes and his old
-math professor, David Victor Feldman. The relevant parts are transcribed below.
+This project came out of a conversation in September 2026 between the author and an old
+math professor of his. The relevant parts are transcribed below.
 
 ---
 
-**Joe:** Hey, while I'm unemployed and looking for things to do with myself, do you have
+**Me:** Hey, while I'm unemployed and looking for things to do with myself, do you have
 any ideas? Some website or app or program you wish existed?
 
-**David:** Well now that you mention it... I have been using AI lately for mathematical
+**Professor:** Well now that you mention it... I have been using AI lately for mathematical
 research. Lately I have been using websites Aristotle and Claude.ai to do formal
 verification. The problem is that this keeps me very busy carrying water back and forth
 between the two websites.
@@ -46,7 +46,7 @@ So a go-between program would need to take my place with respect to negotiating 
 dynamically renegotiating the division of labor. But the go-between doesn't have to
 understand the mathematics.
 
-**Joe:** Aristotle and Claude both have APIs you can use. That would be quite a simple
+**Me:** Aristotle and Claude both have APIs you can use. That would be quite a simple
 Python program you could just run locally.
 
 I'm fuzzy on some details. If you have a big verification to work through, wouldn't you
@@ -54,12 +54,12 @@ also need a dependency graph for Claude to be able to break off independent chun
 you build those or does Claude? I would be surprised if Claude could do it without some
 more formal structure on the data.
 
-**David:** Fable is smart enough to do the organization.
+**Professor:** Fable is smart enough to do the organization.
 
-**Joe:** That's got to be very expensive computationally. If you're not paying a lot for
+**Me:** That's got to be very expensive computationally. If you're not paying a lot for
 it, it's being sold to you under market rate prior to planned enshittification. 🙂
 
-**David:** I've been at this for just a month. Trying to use AI to polish about 25
+**Professor:** I've been at this for just a month. Trying to use AI to polish about 25
 manuscripts that have been sitting for years on my hard drives. Amazingly I have made
 great progress without knowing anything much about what's happening under the hood.
 

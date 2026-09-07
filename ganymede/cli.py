@@ -161,7 +161,12 @@ def _drive(run: Run, settings: Settings) -> int:
 
 def main(argv: list[str] | None = None) -> None:
     load_dotenv()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # aristotlelib attaches its own root log handler on import. Use that one rather than adding a second.
+    import aristotlelib  # noqa: F401
+
+    if not logging.root.handlers:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.root.setLevel(logging.INFO)
     for noisy in ("httpx", "httpx2", "httpcore", "httpcore2"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 

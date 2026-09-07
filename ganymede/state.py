@@ -136,7 +136,7 @@ class Run(BaseModel):
             lines.append(f"  halt reason: {self.halt_reason}")
         lines.append(f"  aristotle project: {self.aristotle_project_id}")
         if self.aristotle_project_id:
-            lines.append(f"  dashboard: https://aristotle.harmonic.fun/dashboard/projects/{self.aristotle_project_id}")
+            lines.append(f"  dashboard: https://aristotle.harmonic.fun/dashboard/requests/{self.aristotle_project_id}")
         lines.append(f"  spend: {self.spend.claude_calls} claude calls, {self.spend.aristotle_tasks} aristotle tasks")
         for s in self.slices:
             lines.append(f"  [{s.status:8}] {s.id}: {s.title} ({len(s.attempts)} attempts)")

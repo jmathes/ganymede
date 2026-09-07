@@ -142,7 +142,7 @@ class Orchestrator:
                     self.run.aristotle_project_id = self.formalizer.project_id
                     _say("ARISTOTLE PROJECT CREATED", (
                         f"project id: {self.formalizer.project_id}\n"
-                        f"dashboard:  {ARISTOTLE_DASHBOARD}/projects/{self.formalizer.project_id}\n"
+                        f"dashboard:  {ARISTOTLE_DASHBOARD}/requests/{self.formalizer.project_id}\n"
                         f"cli:        aristotle show {self.formalizer.project_id}"))
                 else:
                     attempt.aristotle_task_id = await self.formalizer.instruct(attempt.prompt)

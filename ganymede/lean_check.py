@@ -14,6 +14,7 @@ report includes that too.
 
 from __future__ import annotations
 
+import os
 import re
 import tarfile
 from pathlib import Path, PurePosixPath
@@ -186,4 +187,76 @@ def report_for_prompt(report: LeanReport, max_theorems: int = 200) -> str:
     for name, text in report.summary_files.items():
         lines.append(f"--- {name} ---")
         lines.append(text.strip())
+    return "\n".join(lines)
+
+
+# ---- optional local verification (needs elan/lake on PATH) -----------------
+
+class LocalBuild(BaseModel):
+    ran: bool
+    ok: bool = False
+    axioms: dict[str, str] = {}      # theorem name -> "#print axioms" line
+    unexpected_axioms: list[str] = []  # theorems depending on anything beyond the standard three
+    output: str = ""
+
+STANDARD_AXIOMS = {"propext", "Quot.sound", "Classical.choice"}
+AXIOM_LINE_RE = re.compile(r"'([^']+)' (?:depends on axioms: \[([^\]]*)\]|does not depend on any axioms)")
+
+
+def local_build(tarball: Path | str, timeout_s: float = 3600, workdir: Path | None = None) -> LocalBuild:
+    """Extract a result tarball, run `lake build`, and `#print axioms` for every theorem it declares.
+
+    Independent of Aristotle's own build: this is Lean on this machine checking the same files. If lake
+    is not installed, returns ran=False. A Mathlib project needs its dependencies fetched, which lake
+    does on first build (large download); the timeout covers that.
+    """
+    import shutil as _shutil
+    import subprocess
+    import tempfile
+
+    lake = _shutil.which("lake") or (Path.home() / ".elan" / "bin" / "lake")
+    if not Path(lake).exists():
+        return LocalBuild(ran=False, output="lake not found; install elan (see REFERENCE.md)")
+
+    tarball = Path(tarball)
+    tmp = tempfile.mkdtemp(prefix="ganymede-verify-", dir=workdir)
+    try:
+        with tarfile.open(tarball, "r:*") as tar:
+            tar.extractall(tmp, filter="data")
+        roots = [p for p in Path(tmp).iterdir() if p.is_dir()]
+        root = roots[0] if len(roots) == 1 and not (Path(tmp) / "lakefile.toml").exists() and not (Path(tmp) / "lakefile.lean").exists() else Path(tmp)
+        env = {**os.environ, "PATH": f"{Path(lake).parent}:{os.environ.get('PATH', '')}"}
+        build = subprocess.run([str(lake), "build"], cwd=root, capture_output=True, text=True, timeout=timeout_s, env=env)
+        out = build.stdout[-4000:] + build.stderr[-4000:]
+        if build.returncode != 0:
+            return LocalBuild(ran=True, ok=False, output=out)
+        # Import every project module and print axioms for every theorem/lemma we found statically.
+        report = inspect_directory(root)
+        modules = sorted({f[:-5].replace("/", ".") for f in report.lean_files})
+        names = [d.name for d in report.theorems]
+        probe = root / "GanymedeAxioms.lean"
+        probe.write_text("".join(f"import {m}\n" for m in modules) + "".join(f"#print axioms {n}\n" for n in names))
+        pa = subprocess.run([str(lake), "env", "lean", str(probe)], cwd=root, capture_output=True, text=True, timeout=timeout_s, env=env)
+        axioms: dict[str, str] = {}
+        unexpected: list[str] = []
+        for m in AXIOM_LINE_RE.finditer(pa.stdout):
+            axioms[m.group(1)] = m.group(0)
+            used = {a.strip() for a in (m.group(2) or "").split(",") if a.strip()}
+            if used - STANDARD_AXIOMS:
+                unexpected.append(m.group(1))
+        return LocalBuild(ran=True, ok=pa.returncode == 0 and "sorryAx" not in pa.stdout, axioms=axioms, unexpected_axioms=unexpected, output=out + pa.stdout[-4000:] + pa.stderr[-2000:])
+    finally:
+        _shutil.rmtree(tmp, ignore_errors=True)
+
+
+def local_build_for_prompt(lb: LocalBuild) -> str:
+    if not lb.ran:
+        return f"Local Lean build: not run ({lb.output})"
+    lines = [f"Local Lean build on this machine: {'OK' if lb.ok else 'FAILED'}"]
+    for name, line in lb.axioms.items():
+        lines.append("  " + line)
+    if lb.unexpected_axioms:
+        lines.append("  UNEXPECTED AXIOMS in: " + ", ".join(lb.unexpected_axioms))
+    if not lb.ok:
+        lines.append(lb.output.strip()[-3000:])
     return "\n".join(lines)

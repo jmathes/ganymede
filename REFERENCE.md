@@ -68,6 +68,17 @@ await p.ask("Next slice: ...", mode=FollowUpMode.INSTRUCT, files=["slice2.md"])
 - It has no documented concurrency or rate limits, no documented project-size limit beyond the per-file cap, and no SLA. Assume long jobs and occasional `FAILED` with "the team at Harmonic has been notified."
 - The one published multi-lemma case study found Aristotle good at bounded local lemmas and weak at the global bookkeeping that ties them together. That is the bottleneck where the "Claude handoff" is expected to help.
 
+### Observed behavior (one real job, 2026-09-07)
+
+From submitting `examples/toy/` (two `sorry`s, no Mathlib) through `ganymede/formalizer.py` with questions enabled; full log in `examples/toy/aristotle_run.log`.
+
+- Total wall time was under three minutes. Aristotle asked its question at the start, got the answer from code within a second, acknowledged it in the event stream, and continued.
+- `AGENT_QUESTION` events arrive with `suggestions` (three suggested answers in this case). The same question is re-emitted after answering, with the answer attached; treat repeats by event id.
+- The task ended with status `COMPLETE_WITH_ERRORS` even though the result was clean, the summary said so, and it rebuilt locally. Do not use task status as a success signal; use the tarball.
+- The result tarball was 1.5 KB: `.lake/` is not included. Files sit under a top-level directory named `<project>_aristotle/`. Aristotle adds `ARISTOTLE_SUMMARY.md` and a `README.md` on its own, and wrote the `SUMMARY.md` and `AXIOMS.txt` it was asked for.
+- Events include the exact shell commands Aristotle ran (`sed -i ...`, `lake build`) and file edits, so the stream is enough to reconstruct what it did. It committed and pushed to its own git remote at the end.
+- Without Mathlib it had to prove `sumOdd n = n * n` with `Nat.succ_mul`, `Nat.mul_succ`, and `omega`, and did so on the second try.
+
 ## Sources
 
 - [Aristotle](https://aristotle.harmonic.fun/) (Harmonic)

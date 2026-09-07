@@ -41,6 +41,7 @@ class Attempt(BaseModel):
     task_status: str | None = None
     tarball: str | None = None
     lean_report: dict | None = None
+    local_build: dict | None = None
     grade: dict | None = None
     decision: str | None = None      # accept | retry | handoff | give_up
 

@@ -17,7 +17,7 @@ from pathlib import Path
 from ganymede.advisor import Advisor, BudgetExceeded, SlicePlan, SliceSpec
 from ganymede.config import Settings
 from ganymede.formalizer import Formalizer
-from ganymede.lean_check import inspect_directory, inspect_tarball, report_for_prompt
+from ganymede.lean_check import inspect_directory, inspect_tarball, local_build, local_build_for_prompt, report_for_prompt
 from ganymede.notify import notify
 from ganymede.state import Attempt, Run, RunStatus, Slice, SliceStatus, now, write_json
 
@@ -150,6 +150,12 @@ class Orchestrator:
             report = inspect_tarball(tarball)
             attempt.lean_report = report.model_dump()
             report_text = report_for_prompt(report)
+            if self.settings.local_build:
+                lb = local_build(tarball, timeout_s=self.settings.local_build_timeout_s)
+                attempt.local_build = lb.model_dump()
+                report_text += "\n" + local_build_for_prompt(lb)
+                if lb.ran and (not lb.ok or lb.unexpected_axioms):
+                    report.sorries = report.sorries or ["(local build failed or found unexpected axioms; see below)"]
 
             grade = self.advisor.grade(
                 self.plan, spec, attempt.prompt, result.status, result.summary, report_text,

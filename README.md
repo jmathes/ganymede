@@ -72,6 +72,8 @@ ganymede resume <run-id>                 # after a crash, reboot, or halt
 ganymede check result.tar.gz             # static done-check of any Aristotle tarball
 ```
 
+`examples/toy/` is a tiny Mathlib-free Lean project with two sorries, plus the tarball and event log from the first real Aristotle job on it. Useful for smoke tests: `ganymede check examples/toy/aristotle_result.tar.gz`.
+
 A run lives in `runs/<run-id>/`: `state.json` (everything needed to resume), `plan.json` (the slices), `tarballs/` (every Aristotle result), `transcripts/` (every Claude exchange), and `REPORT.md` at the end.
 
 How the loop works: the mathematician (Claude) reads the paper and plans slices with dependencies. For each slice it writes Aristotle's instructions at a detail level that starts terse and rises after each failure. Aristotle runs on one persistent project; when it asks a question mid-task, the mathematician answers it within Aristotle's 15-minute window. Each result tarball goes through a static check (no `sorry`, no `axiom`, theorem statements extracted) and then to the mathematician for grading, with the referee able to overrule. Grading decides accept, retry, handoff (the mathematician writes the detailed route), or give up. When every slice is accepted, a final fidelity check compares each of the paper's main claims to the Lean theorem that is supposed to establish it. Guards on attempts, tasks, calls, and hours halt the run and notify you instead of looping.

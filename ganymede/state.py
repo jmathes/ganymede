@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
@@ -10,6 +11,8 @@ from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, Field
+
+log = logging.getLogger("ganymede")
 
 
 def now() -> str:
@@ -104,6 +107,7 @@ class Run(BaseModel):
         os.replace(tmp, path)
 
     def log(self, msg: str, runs_dir: Path | None = None) -> None:
+        log.info(msg)
         self.notes.append(f"{now()} {msg}")
         if runs_dir is not None:
             self.save(runs_dir)

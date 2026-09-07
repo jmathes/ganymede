@@ -104,6 +104,11 @@ class Orchestrator:
             for s in self.plan.slices
         ]
         self.run.log(f"planned {len(self.run.slices)} slices", self.settings.runs_dir)
+        _say("PAPER SUMMARY", self.plan.paper_summary)
+        _say("MAIN CLAIMS", "\n".join(f"- {c}" for c in self.plan.main_claims))
+        for sl in self.run.slices:
+            deps = f" (after {', '.join(sl.depends_on)})" if sl.depends_on else ""
+            _say(f"SLICE {sl.id}{deps}: {sl.title}", sl.goal)
 
     async def _work_slice(self, slice_: Slice) -> None:
         spec = self._spec(slice_)
@@ -123,6 +128,7 @@ class Orchestrator:
                 self.run.log(f"{slice_.id}: resuming attempt {attempt_no - 1} task {attempt.aristotle_task_id}", self.settings.runs_dir)
             else:
                 attempt = self._new_attempt(spec, slice_, last)
+                _say(f"INSTRUCTIONS TO ARISTOTLE for {slice_.id}, attempt {attempt_no}, detail level {attempt.detail_level}", attempt.prompt)
                 self._check_task_guard()
                 if self.formalizer.project_id is None:
                     lean_dir = Path(self.run.lean_project_dir) if self.run.lean_project_dir else None
@@ -137,6 +143,8 @@ class Orchestrator:
             attempt.task_status = result.status
             attempt.finished_at = now()
             self.run.log(f"{slice_.id}: task {result.task_id} ended {result.status}", self.settings.runs_dir)
+            if result.summary:
+                _say("ARISTOTLE'S SUMMARY", result.summary)
 
             if result.status in ("FAILED", "CANCELED"):
                 attempt.decision = "retry"
@@ -150,9 +158,11 @@ class Orchestrator:
             report = inspect_tarball(tarball)
             attempt.lean_report = report.model_dump()
             report_text = report_for_prompt(report)
+            _say(f"LEAN CHECK of {tarball.name}", report_text)
             if self.settings.local_build:
                 lb = local_build(tarball, timeout_s=self.settings.local_build_timeout_s)
                 attempt.local_build = lb.model_dump()
+                _say("LOCAL BUILD", local_build_for_prompt(lb))
                 report_text += "\n" + local_build_for_prompt(lb)
                 if lb.ran and (not lb.ok or lb.unexpected_axioms):
                     report.sorries = report.sorries or ["(local build failed or found unexpected axioms; see below)"]
@@ -164,6 +174,8 @@ class Orchestrator:
             attempt.grade = grade.model_dump()
             attempt.decision = grade.decision
             self.run.log(f"{slice_.id}: attempt {attempt_no} graded {grade.decision} (fidelity {grade.statement_fidelity})", self.settings.runs_dir)
+            _say("GRADE", f"decision: {grade.decision}\nfidelity: {grade.statement_fidelity}: {grade.fidelity_notes}\n{grade.reasoning}"
+                 + (f"\nHANDOFF NOTES:\n{grade.handoff_notes}" if grade.handoff_notes else ""))
 
             if grade.decision == "accept":
                 if not report.clean or grade.statement_fidelity != "matches":
@@ -205,7 +217,9 @@ class Orchestrator:
 
     def _question_handler(self, spec: SliceSpec):
         async def handle(question: str, suggestions: list[str], recent: list[str]) -> str:
+            _say("ARISTOTLE ASKS", question + ("\nsuggested: " + " | ".join(suggestions) if suggestions else ""))
             ans = self.advisor.answer(self.plan, spec, question, suggestions, "\n".join(recent))
+            _say("ANSWER", ans.answer)
             self.run.log(f"{spec.id}: answered Aristotle: {question[:120]!r} -> {ans.answer[:120]!r}", self.settings.runs_dir)
             return ans.answer
 
@@ -229,6 +243,7 @@ class Orchestrator:
         self.run.final_report = final.model_dump()
         write_json(self.run_dir / "final_report.json", final.model_dump())
         (self.run_dir / "REPORT.md").write_text(_render_report(self.run, final, report.brief()))
+        _say("FINAL REPORT", f"verified: {final.verified}\n" + "\n".join(final.claim_status) + ("\ncaveats:\n" + "\n".join(final.caveats) if final.caveats else "") + f"\n{final.summary}")
         if final.verified:
             self.run.status = RunStatus.DONE
             self._save()
@@ -262,6 +277,12 @@ class Orchestrator:
         self.run.halt_reason = reason
         self._save()
         notify(f"Ganymede run {self.run.run_id} HALTED: {reason}\n{self.run.summary()}", self.settings.notify_cmd)
+
+
+def _say(title: str, body: str) -> None:
+    """Everything the run records on disk that a person would want to see also goes to the terminal."""
+    bar = "=" * 8
+    log.info("%s %s %s\n%s", bar, title, bar, body.rstrip())
 
 
 def _brief(report: dict | None) -> str:

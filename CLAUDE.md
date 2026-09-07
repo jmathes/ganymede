@@ -7,5 +7,5 @@ An automated go-between that carries work between Claude and Aristotle (Harmonic
 - Markdown files use one line per paragraph and per bullet, no hard wrapping.
 - The professor who inspired the project is anonymized in every committed file. Refer to him as "the professor." Personal details live in CLAUDE.local.md, which is gitignored.
 - REFERENCE.md claims about the Aristotle SDK were verified by reading `aristotlelib` source. When the SDK version changes, re-check before relying on them.
-- Python. Use a venv; do not install into the system interpreter.
+- Python 3.12 in a conda env named `ganymede` on the local machine (not in the repo). `scripts/sync-env.sh` creates it and installs requirements.txt; `scripts/sync-env.sh add PKG` installs a package and re-freezes requirements.txt. Never pip install into the env by hand without re-freezing.
 - Commit only when asked.

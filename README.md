@@ -56,7 +56,7 @@ Getting the mathematician, the referee and the formalizer all talking to one ano
 
 ## Running it
 
-Nothing here has run against the live services yet; see TODO.md. The intended use:
+Step-by-step instructions for someone new to all of this are in [GETTING_STARTED.md](GETTING_STARTED.md). The short version:
 
 ```bash
 scripts/sync-env.sh                      # creates conda env "ganymede" and installs requirements.txt
@@ -66,6 +66,7 @@ export ARISTOTLE_API_KEY=...             # from aristotle.harmonic.fun/dashboard
 # Claude: by default Ganymede shells out to `claude -p`, which uses the Claude Code login already on
 # this machine and draws on your Claude subscription. Set ANTHROPIC_API_KEY instead to bill the API.
 
+ganymede doctor                          # checks keys, Claude, Lean; says what to fix
 ganymede run --paper paper.tex --lean-project ./my-lean-project
 ganymede status                          # all runs
 ganymede resume <run-id>                 # after a crash, reboot, or halt

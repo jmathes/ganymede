@@ -17,7 +17,7 @@ from pathlib import Path
 from ganymede.advisor import Advisor, BudgetExceeded, SlicePlan, SliceSpec
 from ganymede.config import Settings
 from ganymede.formalizer import Formalizer
-from ganymede.lean_check import inspect_directory, inspect_tarball, local_build, local_build_for_prompt, report_for_prompt
+from ganymede.lean_check import ensure_built, inspect_directory, inspect_tarball, local_build, local_build_for_prompt, report_for_prompt
 from ganymede.notify import notify
 from ganymede.state import Attempt, Run, RunStatus, Slice, SliceStatus, now, write_json
 
@@ -132,6 +132,9 @@ class Orchestrator:
                 self._check_task_guard()
                 if self.formalizer.project_id is None:
                     lean_dir = Path(self.run.lean_project_dir) if self.run.lean_project_dir else None
+                    if lean_dir is not None and self.settings.lake_build:
+                        ok = ensure_built(lean_dir, timeout_s=self.settings.local_build_timeout_s)
+                        self.run.log(f"lake build before upload: {'ok' if ok else 'skipped or failed'}", self.settings.runs_dir)
                     attempt.aristotle_task_id = await self.formalizer.create(attempt.prompt, lean_dir)
                     self.run.aristotle_project_id = self.formalizer.project_id
                 else:

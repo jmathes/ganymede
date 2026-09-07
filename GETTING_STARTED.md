@@ -122,7 +122,8 @@ All are environment variables you can put in `.env`:
 - `GANYMEDE_MAX_RUN_HOURS` (default 72): total time before the run halts.
 - `GANYMEDE_REFEREE=0`: turn off the skeptical referee, which halves Claude usage at some cost in caution.
 - `GANYMEDE_MODEL`: which Claude to use. Default `claude-opus-5`.
-- `GANYMEDE_LOCAL_BUILD=0`: skip rebuilding results with your own Lean. The first local build of a Mathlib project downloads several gigabytes.
+- `GANYMEDE_LAKE_BUILD=0` or `--no-lake-build`: upload the Lean project without running `lake build` in it first. By default Ganymede builds it so Aristotle receives the project's dependencies; for a Mathlib project that means fetching Mathlib's prebuilt cache, several gigabytes, the first time.
+- `GANYMEDE_LOCAL_BUILD=0`: skip rebuilding results with your own Lean after each Aristotle task.
 
 ## 8. Checking any Aristotle result by hand
 

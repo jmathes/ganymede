@@ -33,6 +33,9 @@ class Settings:
     max_task_hours: float = field(default_factory=lambda: _env_float("GANYMEDE_MAX_TASK_HOURS", 10))
     max_run_hours: float = field(default_factory=lambda: _env_float("GANYMEDE_MAX_RUN_HOURS", 72))
 
+    # Run `lake build` in the Lean project before the first upload so Aristotle gets its dependencies.
+    lake_build: bool = field(default_factory=lambda: os.environ.get("GANYMEDE_LAKE_BUILD", "1") != "0")
+
     # Rebuild every Aristotle result with the local Lean toolchain and print its axioms (needs elan).
     local_build: bool = field(default_factory=lambda: os.environ.get("GANYMEDE_LOCAL_BUILD", "1") != "0")
     local_build_timeout_s: float = field(default_factory=lambda: _env_float("GANYMEDE_LOCAL_BUILD_TIMEOUT", 3600))

@@ -1,7 +1,8 @@
 """Definition of done for a Lean result (TODO step 3), applied to an Aristotle result tarball.
 
-We do not have a Lean toolchain locally, so this is static: it reads the .lean sources and reports
-what a human would look for before trusting a green build. The three checks that matter:
+The core check is static: it reads the .lean sources and reports what a human would look for before
+trusting a green build. When a Lean toolchain is installed, `local_build` also rebuilds the result and
+prints its axioms, and `ensure_built` prepares a project before upload. The three static checks:
 
   1. No `sorry` anywhere outside comments.
   2. No user-declared `axiom` (Aristotle proving a theorem by assuming it).
@@ -15,7 +16,10 @@ report includes that too.
 from __future__ import annotations
 
 import os
+import logging
 import re
+
+log = logging.getLogger("ganymede")
 import tarfile
 from pathlib import Path, PurePosixPath
 
@@ -260,3 +264,35 @@ def local_build_for_prompt(lb: LocalBuild) -> str:
     if not lb.ok:
         lines.append(lb.output.strip()[-3000:])
     return "\n".join(lines)
+
+
+def ensure_built(project_dir: Path | str, timeout_s: float = 3600, runner=None) -> bool:
+    """Run `lake build` in a Lean project before uploading it, so Aristotle gets a `.lake` folder and
+    the SDK stops warning. For a Mathlib project, fetch the prebuilt cache first (`lake exe cache get`)
+    so the build takes minutes rather than hours. Returns True if the build succeeded. A missing lake
+    or a failed build is logged and returns False; the upload proceeds either way."""
+    import shutil as _shutil
+    import subprocess
+
+    runner = runner or subprocess.run
+    project_dir = Path(project_dir)
+    lake = _shutil.which("lake") or (Path.home() / ".elan" / "bin" / "lake")
+    if not Path(lake).exists():
+        log.warning("lake not found; uploading %s without a .lake folder", project_dir)
+        return False
+    env = {**os.environ, "PATH": f"{Path(lake).parent}:{os.environ.get('PATH', '')}"}
+    lakefiles = [project_dir / "lakefile.toml", project_dir / "lakefile.lean"]
+    uses_mathlib = any(f.is_file() and "mathlib" in f.read_text().lower() for f in lakefiles)
+    steps = ([["exe", "cache", "get"]] if uses_mathlib else []) + [["build"]]
+    for step in steps:
+        log.info("lake %s in %s", " ".join(step), project_dir)
+        try:
+            proc = runner([str(lake), *step], cwd=project_dir, capture_output=True, text=True, timeout=timeout_s, env=env)
+        except subprocess.TimeoutExpired:
+            log.warning("lake %s timed out after %.0fs", " ".join(step), timeout_s)
+            return False
+        if proc.returncode != 0:
+            log.warning("lake %s failed:\n%s", " ".join(step), (proc.stdout + proc.stderr)[-3000:])
+            if step == ["build"]:
+                return False
+    return True

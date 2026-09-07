@@ -37,6 +37,8 @@ def _settings(args) -> Settings:
         s.model = args.model
     if getattr(args, "no_referee", False):
         s.use_referee = False
+    if getattr(args, "no_lake_build", False):
+        s.lake_build = False
     return s
 
 
@@ -180,12 +182,14 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--run-id")
     p.add_argument("--model")
     p.add_argument("--no-referee", action="store_true")
+    p.add_argument("--no-lake-build", action="store_true", help="upload the Lean project without running `lake build` first")
     p.set_defaults(fn=cmd_run)
 
     p = sub.add_parser("resume", help="continue a run after a crash or halt")
     p.add_argument("run_id")
     p.add_argument("--model")
     p.add_argument("--no-referee", action="store_true")
+    p.add_argument("--no-lake-build", action="store_true", help="upload the Lean project without running `lake build` first")
     p.set_defaults(fn=cmd_resume)
 
     p = sub.add_parser("status", help="show run status")

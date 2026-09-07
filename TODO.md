@@ -14,4 +14,5 @@ Status as of 2026-09-07. Steps marked DONE are implemented and unit-tested with 
 Open questions found while building:
 - Ganymede never interrupts a running Aristotle task except on the per-task hour limit. The professor sometimes stops Aristotle mid-search to hand off. Detecting "stuck" from the event stream would need real event logs to look at (step 1).
 - All slices run sequentially on one Aristotle project. Independent slices could run on parallel projects, but merging their Lean files back together is unsolved.
+- The `claude -p` backend depends on Claude Code CLI behavior (flags, JSON envelope, subscription policy), which Anthropic changes often. If it breaks, `GANYMEDE_CLAUDE_BACKEND=api` with an API key is the fallback.
 - Claude refusal fallbacks are not enabled. Mathematical text should not trigger them; add `fallbacks` per the Claude API docs if it ever does.

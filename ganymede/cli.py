@@ -81,11 +81,11 @@ def cmd_check(args) -> int:
 
 
 def _drive(run: Run, settings: Settings) -> int:
-    from ganymede.advisor import ClaudeAdvisor
+    from ganymede.advisor import make_advisor
     from ganymede.formalizer import AristotleFormalizer
     from ganymede.orchestrator import Orchestrator
 
-    advisor = ClaudeAdvisor(settings, spend=run.spend, transcript_dir=run.dir(settings.runs_dir) / "transcripts")
+    advisor = make_advisor(settings, spend=run.spend, transcript_dir=run.dir(settings.runs_dir) / "transcripts")
     formalizer = AristotleFormalizer(project_id=run.aristotle_project_id)
     orch = Orchestrator(run, settings, advisor, formalizer)
     run = asyncio.run(orch.run_to_completion())

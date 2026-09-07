@@ -6,7 +6,11 @@ enabled, sees the mathematician's proposed judgment and may override it.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -84,37 +88,28 @@ class Advisor(Protocol):
 
 # ---- Claude implementation --------------------------------------------------
 
-class ClaudeAdvisor:
-    def __init__(self, settings: Settings, spend: Spend | None = None, transcript_dir: Path | None = None):
-        import anthropic  # imported here so tests with the fake never need the SDK configured
+class _RoleAdvisor:
+    """Shared role logic. Subclasses implement _invoke(system, user, schema) -> (parsed, in_tokens, out_tokens)."""
 
+    def __init__(self, settings: Settings, spend: Spend | None = None, transcript_dir: Path | None = None):
         self.settings = settings
         self.spend = spend if spend is not None else Spend()
         self.transcript_dir = transcript_dir
-        self.client = anthropic.Anthropic(timeout=settings.claude_timeout_s, max_retries=3)
         self.mathematician = (PROMPTS / "mathematician.md").read_text()
         self.referee = (PROMPTS / "referee.md").read_text()
+
+    def _invoke(self, system: str, user: str, schema: type[BaseModel], tag: str) -> tuple[BaseModel, int, int]:
+        raise NotImplementedError
 
     def _call(self, system: str, user: str, schema: type[BaseModel], tag: str):
         if self.spend.claude_calls >= self.settings.max_claude_calls:
             raise BudgetExceeded(f"claude call budget of {self.settings.max_claude_calls} reached")
         self.spend.claude_calls += 1
-        response = self.client.messages.parse(
-            model=self.settings.model,
-            max_tokens=self.settings.max_tokens,
-            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": user}],
-            output_config={"effort": self.settings.effort},
-            output_format=schema,
-        )
-        self.spend.claude_input_tokens += response.usage.input_tokens
-        self.spend.claude_output_tokens += response.usage.output_tokens
-        if response.stop_reason == "refusal":
-            raise AdvisorError(f"Claude refused ({tag}): {getattr(response.stop_details, 'explanation', '')}")
-        if response.parsed_output is None:
-            raise AdvisorError(f"Claude returned no parsable output ({tag}), stop_reason={response.stop_reason}")
-        self._transcribe(tag, user, response.parsed_output)
-        return response.parsed_output
+        parsed, in_tok, out_tok = self._invoke(system, user, schema, tag)
+        self.spend.claude_input_tokens += in_tok
+        self.spend.claude_output_tokens += out_tok
+        self._transcribe(tag, user, parsed)
+        return parsed
 
     def _transcribe(self, tag: str, user: str, out: BaseModel) -> None:
         if not self.transcript_dir:
@@ -217,6 +212,88 @@ class ClaudeAdvisor:
                 report.caveats.append(f"REFEREE OBJECTION: {verdict.objection}")
                 report.verified = False
         return report
+
+
+class ClaudeAdvisor(_RoleAdvisor):
+    """Anthropic API backend. Needs ANTHROPIC_API_KEY (or `ant auth login`). Billed per token."""
+
+    def __init__(self, settings: Settings, spend: Spend | None = None, transcript_dir: Path | None = None):
+        import anthropic  # imported here so tests never need the SDK configured
+
+        super().__init__(settings, spend, transcript_dir)
+        self.client = anthropic.Anthropic(timeout=settings.claude_timeout_s, max_retries=3)
+
+    def _invoke(self, system, user, schema, tag):
+        response = self.client.messages.parse(
+            model=self.settings.model,
+            max_tokens=self.settings.max_tokens,
+            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user}],
+            output_config={"effort": self.settings.effort},
+            output_format=schema,
+        )
+        if response.stop_reason == "refusal":
+            raise AdvisorError(f"Claude refused ({tag}): {getattr(response.stop_details, 'explanation', '')}")
+        if response.parsed_output is None:
+            raise AdvisorError(f"Claude returned no parsable output ({tag}), stop_reason={response.stop_reason}")
+        return response.parsed_output, response.usage.input_tokens, response.usage.output_tokens
+
+
+class ClaudeCodeAdvisor(_RoleAdvisor):
+    """Claude Code CLI backend: `claude -p` with a JSON schema. Uses the machine's existing Claude Code
+    login, so it draws on the user's Claude subscription instead of an API key. No tools are exposed;
+    each call is a single structured turn."""
+
+    def __init__(self, settings: Settings, spend: Spend | None = None, transcript_dir: Path | None = None,
+                 runner: Callable[[list[str], str], subprocess.CompletedProcess] | None = None, claude_bin: str = "claude"):
+        super().__init__(settings, spend, transcript_dir)
+        self.claude_bin = claude_bin
+        self.runner = runner or self._run
+
+    def _run(self, argv: list[str], stdin: str) -> subprocess.CompletedProcess:
+        cwd = self.transcript_dir if self.transcript_dir else None
+        if cwd:
+            cwd.mkdir(parents=True, exist_ok=True)
+        return subprocess.run(argv, input=stdin, capture_output=True, text=True, timeout=self.settings.claude_timeout_s, cwd=cwd)
+
+    def _invoke(self, system, user, schema, tag):
+        argv = [
+            self.claude_bin, "-p",
+            "--output-format", "json",
+            "--json-schema", json.dumps(schema.model_json_schema()),
+            "--system-prompt", system,
+            "--model", self.settings.model,
+            "--effort", self.settings.effort,
+            "--tools", "",
+            "--no-session-persistence",
+        ]
+        proc = self.runner(argv, user)
+        if proc.returncode != 0:
+            raise AdvisorError(f"claude -p failed ({tag}), exit {proc.returncode}: {proc.stderr[-2000:] or proc.stdout[-2000:]}")
+        try:
+            data = json.loads(proc.stdout)
+        except json.JSONDecodeError as e:
+            raise AdvisorError(f"claude -p returned non-JSON ({tag}): {proc.stdout[:500]}") from e
+        if data.get("is_error"):
+            raise AdvisorError(f"claude -p error ({tag}): {data.get('result')}")
+        out = data.get("structured_output")
+        if out is None:
+            raise AdvisorError(f"claude -p returned no structured_output ({tag}): {data.get('result', '')[:500]}")
+        usage = data.get("usage") or {}
+        in_tok = int(usage.get("input_tokens", 0)) + int(usage.get("cache_read_input_tokens", 0)) + int(usage.get("cache_creation_input_tokens", 0))
+        return schema.model_validate(out), in_tok, int(usage.get("output_tokens", 0))
+
+
+def make_advisor(settings: Settings, spend: Spend | None = None, transcript_dir: Path | None = None) -> _RoleAdvisor:
+    """Pick a backend: GANYMEDE_CLAUDE_BACKEND=cli|api, else api if ANTHROPIC_API_KEY is set, else cli."""
+    backend = settings.claude_backend
+    if backend == "auto":
+        backend = "api" if os.environ.get("ANTHROPIC_API_KEY") else "cli"
+    if backend == "api":
+        return ClaudeAdvisor(settings, spend, transcript_dir)
+    if backend == "cli":
+        return ClaudeCodeAdvisor(settings, spend, transcript_dir)
+    raise ValueError(f"unknown GANYMEDE_CLAUDE_BACKEND {backend!r}; use cli or api")
 
 
 class AdvisorError(RuntimeError):

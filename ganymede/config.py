@@ -17,7 +17,9 @@ def _env_float(name: str, default: float) -> float:
 
 @dataclass
 class Settings:
-    # Claude
+    # Claude. Backend "cli" shells out to `claude -p` and uses the Claude Code login (subscription);
+    # "api" uses the Anthropic SDK with ANTHROPIC_API_KEY; "auto" picks api if that key is set, else cli.
+    claude_backend: str = field(default_factory=lambda: os.environ.get("GANYMEDE_CLAUDE_BACKEND", "auto"))
     model: str = field(default_factory=lambda: os.environ.get("GANYMEDE_MODEL", "claude-opus-5"))
     effort: str = field(default_factory=lambda: os.environ.get("GANYMEDE_EFFORT", "high"))
     max_tokens: int = field(default_factory=lambda: _env_int("GANYMEDE_MAX_TOKENS", 16000))

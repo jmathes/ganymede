@@ -63,7 +63,8 @@ scripts/sync-env.sh                      # creates conda env "ganymede" and inst
 conda activate ganymede
 pip install -e .
 export ARISTOTLE_API_KEY=...             # from aristotle.harmonic.fun/dashboard/keys
-export ANTHROPIC_API_KEY=...             # or `ant auth login`
+# Claude: by default Ganymede shells out to `claude -p`, which uses the Claude Code login already on
+# this machine and draws on your Claude subscription. Set ANTHROPIC_API_KEY instead to bill the API.
 
 ganymede run --paper paper.tex --lean-project ./my-lean-project
 ganymede status                          # all runs
@@ -75,4 +76,4 @@ A run lives in `runs/<run-id>/`: `state.json` (everything needed to resume), `pl
 
 How the loop works: the mathematician (Claude) reads the paper and plans slices with dependencies. For each slice it writes Aristotle's instructions at a detail level that starts terse and rises after each failure. Aristotle runs on one persistent project; when it asks a question mid-task, the mathematician answers it within Aristotle's 15-minute window. Each result tarball goes through a static check (no `sorry`, no `axiom`, theorem statements extracted) and then to the mathematician for grading, with the referee able to overrule. Grading decides accept, retry, handoff (the mathematician writes the detailed route), or give up. When every slice is accepted, a final fidelity check compares each of the paper's main claims to the Lean theorem that is supposed to establish it. Guards on attempts, tasks, calls, and hours halt the run and notify you instead of looping.
 
-Settings are env vars with `GANYMEDE_` prefixes; see `ganymede/config.py`.
+Settings are env vars with `GANYMEDE_` prefixes; see `ganymede/config.py`. The two Claude backends are `cli` (`claude -p` with a JSON schema, subscription billing, the default when no API key is set) and `api` (the Anthropic SDK). They share the same prompts and structured outputs; pick with `GANYMEDE_CLAUDE_BACKEND`.

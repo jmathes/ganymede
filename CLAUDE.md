@@ -13,7 +13,7 @@ An automated go-between that carries work between Claude and Aristotle (Harmonic
 ## Layout
 
 - `ganymede/orchestrator.py` is the loop; it does no math and calls no SDK directly.
-- `ganymede/advisor.py` is the Claude side (mathematician and referee roles, structured outputs via `messages.parse`). `ganymede/formalizer.py` is the Aristotle side. Both have a Protocol and a fake; tests use the fakes.
+- `ganymede/advisor.py` is the Claude side (mathematician and referee roles, structured outputs). Two backends: `ClaudeCodeAdvisor` shells out to `claude -p --json-schema` and uses the subscription login (default); `ClaudeAdvisor` uses the Anthropic SDK and an API key. `ganymede/formalizer.py` is the Aristotle side. Both have a Protocol and a fake; tests use the fakes.
 - `ganymede/lean_check.py` is the static definition of done. `ganymede/state.py` is the on-disk run state.
 - `ganymede/prompts/*.md` are the role system prompts. They are the most likely thing to need tuning once real transcripts exist.
 - Run tests with `python -m pytest` inside the env. They need no network or API keys.

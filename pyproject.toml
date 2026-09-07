@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ganymede"
+version = "0.1.0"
+description = "Automated go-between for formal verification with Aristotle and Claude"
+requires-python = ">=3.12"
+dependencies = ["aristotlelib>=2.1.0", "anthropic>=1.4.0", "pydantic>=2"]
+
+[project.scripts]
+ganymede = "ganymede.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ganymede*"]
+
+[tool.setuptools.package-data]
+ganymede = ["prompts/*.md"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

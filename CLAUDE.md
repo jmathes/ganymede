@@ -9,3 +9,11 @@ An automated go-between that carries work between Claude and Aristotle (Harmonic
 - REFERENCE.md claims about the Aristotle SDK were verified by reading `aristotlelib` source. When the SDK version changes, re-check before relying on them.
 - Python 3.12 in a conda env named `ganymede` on the local machine (not in the repo). `scripts/sync-env.sh` creates it and installs requirements.txt; `scripts/sync-env.sh add PKG` installs a package and re-freezes requirements.txt. Never pip install into the env by hand without re-freezing.
 - Commit only when asked.
+
+## Layout
+
+- `ganymede/orchestrator.py` is the loop; it does no math and calls no SDK directly.
+- `ganymede/advisor.py` is the Claude side (mathematician and referee roles, structured outputs via `messages.parse`). `ganymede/formalizer.py` is the Aristotle side. Both have a Protocol and a fake; tests use the fakes.
+- `ganymede/lean_check.py` is the static definition of done. `ganymede/state.py` is the on-disk run state.
+- `ganymede/prompts/*.md` are the role system prompts. They are the most likely thing to need tuning once real transcripts exist.
+- Run tests with `python -m pytest` inside the env. They need no network or API keys.

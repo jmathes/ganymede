@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 *.tar.gz
 .env
+runs/
+*.egg-info/

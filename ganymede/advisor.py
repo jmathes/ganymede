@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -106,6 +107,7 @@ class _RoleAdvisor:
             raise BudgetExceeded(f"claude call budget of {self.settings.max_claude_calls} reached")
         self.spend.claude_calls += 1
         parsed, in_tok, out_tok = self._invoke(system, user, schema, tag)
+        parsed = fix_unicode_escapes(parsed)
         self.spend.claude_input_tokens += in_tok
         self.spend.claude_output_tokens += out_tok
         self._transcribe(tag, user, parsed)
@@ -294,6 +296,26 @@ def make_advisor(settings: Settings, spend: Spend | None = None, transcript_dir:
     if backend == "cli":
         return ClaudeCodeAdvisor(settings, spend, transcript_dir)
     raise ValueError(f"unknown GANYMEDE_CLAUDE_BACKEND {backend!r}; use cli or api")
+
+
+_ESC_RE = re.compile(r"\\u([0-9a-fA-F]{4})")
+
+
+def _unescape(value):
+    if isinstance(value, str):
+        return _ESC_RE.sub(lambda m: chr(int(m.group(1), 16)), value) if "\\u" in value else value
+    if isinstance(value, list):
+        return [_unescape(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _unescape(v) for k, v in value.items()}
+    return value
+
+
+def fix_unicode_escapes(model: BaseModel) -> BaseModel:
+    """Claude's structured output sometimes double-escapes non-ASCII, so a parsed string contains a
+    literal backslash-u sequence (`\\u2115` where ℕ was meant). Lean source with that in it is wrong,
+    so decode such sequences in every string field."""
+    return type(model).model_validate(_unescape(model.model_dump()))
 
 
 class AdvisorError(RuntimeError):

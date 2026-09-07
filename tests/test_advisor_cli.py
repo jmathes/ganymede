@@ -56,3 +56,12 @@ def test_make_advisor_picks_cli_without_api_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert isinstance(make_advisor(Settings(claude_backend="auto")), ClaudeCodeAdvisor)
     assert isinstance(make_advisor(Settings(claude_backend="cli")), ClaudeCodeAdvisor)
+
+
+def test_fix_unicode_escapes():
+    from ganymede.advisor import Instructions, fix_unicode_escapes
+
+    bad = Instructions(detail_level=0, prompt="theorem t (n : \\u2115) (h : 2 \\u2264 n) : \\u2203 p, p \\u2223 n")
+    good = fix_unicode_escapes(bad)
+    assert good.prompt == "theorem t (n : ℕ) (h : 2 ≤ n) : ∃ p, p ∣ n"
+    assert fix_unicode_escapes(good).prompt == good.prompt  # idempotent; real ℕ untouched

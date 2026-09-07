@@ -1,8 +1,7 @@
 """Definition of done for a Lean result (TODO step 3), applied to an Aristotle result tarball.
 
-The core check is static: it reads the .lean sources and reports what a human would look for before
-trusting a green build. When a Lean toolchain is installed, `local_build` also rebuilds the result and
-prints its axioms, and `ensure_built` prepares a project before upload. The three static checks:
+This is static: it reads the .lean sources and reports what a human would look for before trusting a
+green build. Ganymede never runs `lake` itself. The three checks that matter:
 
   1. No `sorry` anywhere outside comments.
   2. No user-declared `axiom` (Aristotle proving a theorem by assuming it).
@@ -15,11 +14,7 @@ report includes that too.
 
 from __future__ import annotations
 
-import os
-import logging
 import re
-
-log = logging.getLogger("ganymede")
 import tarfile
 from pathlib import Path, PurePosixPath
 
@@ -193,106 +188,3 @@ def report_for_prompt(report: LeanReport, max_theorems: int = 200) -> str:
         lines.append(text.strip())
     return "\n".join(lines)
 
-
-# ---- optional local verification (needs elan/lake on PATH) -----------------
-
-class LocalBuild(BaseModel):
-    ran: bool
-    ok: bool = False
-    axioms: dict[str, str] = {}      # theorem name -> "#print axioms" line
-    unexpected_axioms: list[str] = []  # theorems depending on anything beyond the standard three
-    output: str = ""
-
-STANDARD_AXIOMS = {"propext", "Quot.sound", "Classical.choice"}
-AXIOM_LINE_RE = re.compile(r"'([^']+)' (?:depends on axioms: \[([^\]]*)\]|does not depend on any axioms)")
-
-
-def local_build(tarball: Path | str, timeout_s: float = 3600, workdir: Path | None = None) -> LocalBuild:
-    """Extract a result tarball, run `lake build`, and `#print axioms` for every theorem it declares.
-
-    Independent of Aristotle's own build: this is Lean on this machine checking the same files. If lake
-    is not installed, returns ran=False. A Mathlib project needs its dependencies fetched, which lake
-    does on first build (large download); the timeout covers that.
-    """
-    import shutil as _shutil
-    import subprocess
-    import tempfile
-
-    lake = _shutil.which("lake") or (Path.home() / ".elan" / "bin" / "lake")
-    if not Path(lake).exists():
-        return LocalBuild(ran=False, output="lake not found; install elan (see REFERENCE.md)")
-
-    tarball = Path(tarball)
-    tmp = tempfile.mkdtemp(prefix="ganymede-verify-", dir=workdir)
-    try:
-        with tarfile.open(tarball, "r:*") as tar:
-            tar.extractall(tmp, filter="data")
-        roots = [p for p in Path(tmp).iterdir() if p.is_dir()]
-        root = roots[0] if len(roots) == 1 and not (Path(tmp) / "lakefile.toml").exists() and not (Path(tmp) / "lakefile.lean").exists() else Path(tmp)
-        env = {**os.environ, "PATH": f"{Path(lake).parent}:{os.environ.get('PATH', '')}"}
-        build = subprocess.run([str(lake), "build"], cwd=root, capture_output=True, text=True, timeout=timeout_s, env=env)
-        out = build.stdout[-4000:] + build.stderr[-4000:]
-        if build.returncode != 0:
-            return LocalBuild(ran=True, ok=False, output=out)
-        # Import every project module and print axioms for every theorem/lemma we found statically.
-        report = inspect_directory(root)
-        modules = sorted({f[:-5].replace("/", ".") for f in report.lean_files})
-        names = [d.name for d in report.theorems]
-        probe = root / "GanymedeAxioms.lean"
-        probe.write_text("".join(f"import {m}\n" for m in modules) + "".join(f"#print axioms {n}\n" for n in names))
-        pa = subprocess.run([str(lake), "env", "lean", str(probe)], cwd=root, capture_output=True, text=True, timeout=timeout_s, env=env)
-        axioms: dict[str, str] = {}
-        unexpected: list[str] = []
-        for m in AXIOM_LINE_RE.finditer(pa.stdout):
-            axioms[m.group(1)] = m.group(0)
-            used = {a.strip() for a in (m.group(2) or "").split(",") if a.strip()}
-            if used - STANDARD_AXIOMS:
-                unexpected.append(m.group(1))
-        return LocalBuild(ran=True, ok=pa.returncode == 0 and "sorryAx" not in pa.stdout, axioms=axioms, unexpected_axioms=unexpected, output=out + pa.stdout[-4000:] + pa.stderr[-2000:])
-    finally:
-        _shutil.rmtree(tmp, ignore_errors=True)
-
-
-def local_build_for_prompt(lb: LocalBuild) -> str:
-    if not lb.ran:
-        return f"Local Lean build: not run ({lb.output})"
-    lines = [f"Local Lean build on this machine: {'OK' if lb.ok else 'FAILED'}"]
-    for name, line in lb.axioms.items():
-        lines.append("  " + line)
-    if lb.unexpected_axioms:
-        lines.append("  UNEXPECTED AXIOMS in: " + ", ".join(lb.unexpected_axioms))
-    if not lb.ok:
-        lines.append(lb.output.strip()[-3000:])
-    return "\n".join(lines)
-
-
-def ensure_built(project_dir: Path | str, timeout_s: float = 3600, runner=None) -> bool:
-    """Run `lake build` in a Lean project before uploading it, so Aristotle gets a `.lake` folder and
-    the SDK stops warning. For a Mathlib project, fetch the prebuilt cache first (`lake exe cache get`)
-    so the build takes minutes rather than hours. Returns True if the build succeeded. A missing lake
-    or a failed build is logged and returns False; the upload proceeds either way."""
-    import shutil as _shutil
-    import subprocess
-
-    runner = runner or subprocess.run
-    project_dir = Path(project_dir)
-    lake = _shutil.which("lake") or (Path.home() / ".elan" / "bin" / "lake")
-    if not Path(lake).exists():
-        log.warning("lake not found; uploading %s without a .lake folder", project_dir)
-        return False
-    env = {**os.environ, "PATH": f"{Path(lake).parent}:{os.environ.get('PATH', '')}"}
-    lakefiles = [project_dir / "lakefile.toml", project_dir / "lakefile.lean"]
-    uses_mathlib = any(f.is_file() and "mathlib" in f.read_text().lower() for f in lakefiles)
-    steps = ([["exe", "cache", "get"]] if uses_mathlib else []) + [["build"]]
-    for step in steps:
-        log.info("lake %s in %s", " ".join(step), project_dir)
-        try:
-            proc = runner([str(lake), *step], cwd=project_dir, capture_output=True, text=True, timeout=timeout_s, env=env)
-        except subprocess.TimeoutExpired:
-            log.warning("lake %s timed out after %.0fs", " ".join(step), timeout_s)
-            return False
-        if proc.returncode != 0:
-            log.warning("lake %s failed:\n%s", " ".join(step), (proc.stdout + proc.stderr)[-3000:])
-            if step == ["build"]:
-                return False
-    return True

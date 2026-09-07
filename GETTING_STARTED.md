@@ -23,7 +23,7 @@ Git and curl (Ubuntu/Debian; on a Mac these come with Xcode command line tools, 
 sudo apt install git curl
 ```
 
-Lean, via its version manager elan. Accept the defaults when asked:
+Lean is optional. Ganymede never runs it; Aristotle builds everything on its own servers. Install it only if you want to open the results yourself. Via its version manager elan, accepting the defaults when asked:
 
 ```bash
 curl https://elan.lean-lang.org/elan-init.sh -sSf | sh
@@ -98,7 +98,7 @@ The run's output lives in `runs/<run-id>/`, where the run id is printed at the s
 - `tarballs/` holds every result Aristotle returned. The last one is the finished Lean project.
 - `transcripts/` holds every exchange with Claude, one file each, if you want to see the reasoning.
 
-The run ends in one of three states. `done` means every slice was accepted, every theorem statement was judged to match the paper, and the final project rebuilt locally with no `sorry` and no unexpected axioms. `halted` means a guard tripped or a slice was given up on; the reason is printed and stored, and a human should look. `failed` means a bug or an outage; try `resume`.
+The run ends in one of three states. `done` means every slice was accepted, every theorem statement was judged to match the paper, and the final project has no `sorry` and no declared axioms. `halted` means a guard tripped or a slice was given up on; the reason is printed and stored, and a human should look. `failed` means a bug or an outage; try `resume`.
 
 ## 6. Stopping, resuming, checking on it
 
@@ -122,8 +122,6 @@ All are environment variables you can put in `.env`:
 - `GANYMEDE_MAX_RUN_HOURS` (default 72): total time before the run halts.
 - `GANYMEDE_REFEREE=0`: turn off the skeptical referee, which halves Claude usage at some cost in caution.
 - `GANYMEDE_MODEL`: which Claude to use. Default `claude-opus-5`.
-- `GANYMEDE_LAKE_BUILD=0` or `--no-lake-build`: upload the Lean project without running `lake build` in it first. By default Ganymede builds it so Aristotle receives the project's dependencies; for a Mathlib project that means fetching Mathlib's prebuilt cache, several gigabytes, the first time.
-- `GANYMEDE_LOCAL_BUILD=0`: skip rebuilding results with your own Lean after each Aristotle task.
 
 ## 8. Checking any Aristotle result by hand
 

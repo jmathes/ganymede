@@ -11,7 +11,7 @@ from tests.fake_advisor import FakeAdvisor, accept, give_up, handoff, retry
 
 
 def settings(tmp_path, **kw) -> Settings:
-    s = Settings(runs_dir=tmp_path / "runs", use_referee=False, max_attempts_per_slice=3, max_aristotle_tasks=10, max_claude_calls=50, local_build=False, lake_build=False)
+    s = Settings(runs_dir=tmp_path / "runs", use_referee=False, max_attempts_per_slice=3, max_aristotle_tasks=10, max_claude_calls=50)
     for k, v in kw.items():
         setattr(s, k, v)
     return s

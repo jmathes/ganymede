@@ -75,7 +75,13 @@ Every line should say `ok`. If one says `FAIL`, it also says what to do. Run `ga
 
 ## 5. Run it on a paper
 
-Ganymede takes the paper as a text file: LaTeX source (`.tex`), Markdown, or plain text. A PDF will not work; export the source. Then:
+A good first run is the toy example that ships with the repo: a two-theorem "paper" and a matching Lean project with the proofs left as `sorry`. It needs no Mathlib, so it finishes in a few minutes:
+
+```bash
+ganymede run --paper examples/toy/paper.md --lean-project examples/toy
+```
+
+For a real paper, Ganymede takes a text file: LaTeX source (`.tex`), Markdown, or plain text. A PDF will not work; export the source. Then:
 
 ```bash
 ganymede run --paper /path/to/paper.tex

@@ -73,7 +73,7 @@ ganymede resume <run-id>                 # after a crash, reboot, or halt
 ganymede check result.tar.gz             # static done-check of any Aristotle tarball
 ```
 
-`examples/toy/` is a tiny Mathlib-free Lean project with two sorries, plus the tarball and event log from the first real Aristotle job on it. Useful for smoke tests: `ganymede check examples/toy/aristotle_result.tar.gz`.
+`examples/toy/` is a two-theorem paper (`paper.md`), a matching Mathlib-free Lean project with the proofs left as `sorry`, and the tarball and event log from the first real Aristotle job on it. First run: `ganymede run --paper examples/toy/paper.md --lean-project examples/toy`. Smoke test without any keys: `ganymede check examples/toy/aristotle_result.tar.gz`.
 
 A run lives in `runs/<run-id>/`: `state.json` (everything needed to resume), `plan.json` (the slices), `tarballs/` (every Aristotle result), `transcripts/` (every Claude exchange), and `REPORT.md` at the end.
 

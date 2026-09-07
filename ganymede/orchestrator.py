@@ -132,6 +132,11 @@ class Orchestrator:
                 self._check_task_guard()
                 if self.formalizer.project_id is None:
                     lean_dir = Path(self.run.lean_project_dir) if self.run.lean_project_dir else None
+                    if lean_dir is not None and not (lean_dir / ".lake").is_dir():
+                        _say("UPLOADING LEAN PROJECT", (
+                            f"{lean_dir} has never been built, so the Aristotle SDK will warn that there is no .lake folder. "
+                            "That is fine: Ganymede never runs lake, and Aristotle already has Mathlib and the other standard "
+                            "packages on its servers. The warning only matters for projects with unusual dependencies."))
                     attempt.aristotle_task_id = await self.formalizer.create(attempt.prompt, lean_dir)
                     self.run.aristotle_project_id = self.formalizer.project_id
                 else:

@@ -156,6 +156,6 @@ async def test_template_project_used_when_none_given(tmp_path, paper, good_tarba
     run = await Orchestrator(new_run(paper, s), s, adv, form).run_to_completion()
     assert run.status == "done"
     proj = Path(run.lean_project_dir)
-    assert proj == s.runs_dir / "t1" / "project"
+    assert proj == s.runs_dir / "t1" / "paper-t1"  # named after the paper and run so Aristotle's dashboard shows it
     assert (proj / "lakefile.toml").exists() and (proj / "lean-toolchain").read_text().strip() == "leanprover/lean4:v4.28.0"
     assert 'rev = "v4.28.0"' in (proj / "lakefile.toml").read_text()

@@ -10,6 +10,7 @@ mathematician (Claude), the referee (Claude), and the formalizer (Aristotle), an
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import time
 from pathlib import Path
@@ -88,7 +89,9 @@ class Orchestrator:
     def _plan(self) -> None:
         if not self.run.lean_project_dir:
             # No project supplied: start from the template pinned to the Mathlib version Aristotle supports.
-            dest = self.run_dir / "project"
+            # The directory name becomes the project's name on Aristotle's dashboard, so make it say which
+            # paper and which run this is.
+            dest = self.run_dir / _project_name(self.run.paper_path, self.run.run_id)
             if not dest.exists():
                 shutil.copytree(TEMPLATE_PROJECT, dest)
             self.run.lean_project_dir = str(dest)
@@ -280,6 +283,11 @@ class Orchestrator:
         self.run.halt_reason = reason
         self._save()
         notify(f"Ganymede run {self.run.run_id} HALTED: {reason}\n{self.run.summary()}", self.settings.notify_cmd)
+
+
+def _project_name(paper_path: str, run_id: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", Path(paper_path).stem).strip("_") or "paper"
+    return f"{stem}-{run_id[-6:]}"
 
 
 def _say(title: str, body: str) -> None:

@@ -12,6 +12,23 @@ from ganymede.config import Settings
 from ganymede.state import Run
 
 
+def load_dotenv(path: Path = Path(".env")) -> None:
+    """Minimal .env loader: KEY=VALUE lines, no expansion. Existing env vars win."""
+    import os
+
+    if not path.is_file():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.strip().strip("'\"")
+        if k.startswith("export "):
+            k = k[7:].strip()
+        os.environ.setdefault(k, v)
+
+
 def _settings(args) -> Settings:
     s = Settings()
     if getattr(args, "runs_dir", None):
@@ -77,6 +94,7 @@ def _drive(run: Run, settings: Settings) -> int:
 
 
 def main(argv: list[str] | None = None) -> None:
+    load_dotenv()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
 

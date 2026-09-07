@@ -22,6 +22,7 @@ from ganymede.notify import notify
 from ganymede.state import Attempt, Run, RunStatus, Slice, SliceStatus, now, write_json
 
 log = logging.getLogger("ganymede")
+ARISTOTLE_DASHBOARD = "https://aristotle.harmonic.fun/dashboard"
 TEMPLATE_PROJECT = Path(__file__).resolve().parent.parent / "templates" / "lean-project"
 
 
@@ -139,6 +140,10 @@ class Orchestrator:
                             "packages on its servers. The warning only matters for projects with unusual dependencies."))
                     attempt.aristotle_task_id = await self.formalizer.create(attempt.prompt, lean_dir)
                     self.run.aristotle_project_id = self.formalizer.project_id
+                    _say("ARISTOTLE PROJECT CREATED", (
+                        f"project id: {self.formalizer.project_id}\n"
+                        f"dashboard:  {ARISTOTLE_DASHBOARD}/projects/{self.formalizer.project_id}\n"
+                        f"cli:        aristotle show {self.formalizer.project_id}"))
                 else:
                     attempt.aristotle_task_id = await self.formalizer.instruct(attempt.prompt)
                 self.run.spend.aristotle_tasks += 1
